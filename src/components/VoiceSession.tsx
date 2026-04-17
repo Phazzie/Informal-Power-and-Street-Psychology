@@ -31,16 +31,12 @@ export function VoiceSession({ project, onClose }: VoiceSessionProps) {
 
   const startSession = async () => {
     const authorVoice = exportAuthorVoice(project);
-    const systemInstruction = `You are a developmental editor listening to the author's voice material for the project "${project.name}". 
-    Primary Material: ${authorVoice.slice(0, 50000)}
-    Engage in a voice-to-voice dialogue. Push on their patterns, identify subsurface emotional beats, and help them refine their thesis. 
-    Keep responses concise and focused on the material. Always prioritize the author's specificity.`;
 
     try {
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
       nextAudioTimeRef.current = audioContextRef.current.currentTime;
 
-      sessionRef.current = await startLiveSession(systemInstruction, {
+      sessionRef.current = startLiveSession(project.name, authorVoice.slice(0, 50000), {
         onAudioData: (base64) => {
           playAudio(base64);
         },

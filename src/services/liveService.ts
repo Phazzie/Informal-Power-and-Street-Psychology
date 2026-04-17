@@ -1,7 +1,3 @@
-import { GoogleGenAI, Modality } from "@google/genai";
-
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-
 export interface LiveSessionCallbacks {
   onTranscription?: (text: string, role: 'user' | 'model') => void;
   onAudioData?: (data: string) => void;
@@ -10,53 +6,48 @@ export interface LiveSessionCallbacks {
   onError?: (error: any) => void;
 }
 
-export function startLiveSession(systemInstruction: string, callbacks: LiveSessionCallbacks) {
-  const sessionPromise = ai.live.connect({
-    model: "gemini-3.1-flash-live-preview",
-    callbacks: {
-      onopen: () => {
-        console.log("Live session opened");
-      },
-      onmessage: async (message) => {
-        // Handle audio output
-        const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-        if (base64Audio) {
-          callbacks.onAudioData?.(base64Audio);
-        }
+export function startLiveSession(projectName: string, authorVoice: string, callbacks: LiveSessionCallbacks) {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/api/live`;
+  const ws = new WebSocket(wsUrl);
 
-        // Handle transcription
-        const modelTranscript = message.serverContent?.modelTurn?.parts?.[0]?.text;
-        if (modelTranscript) {
-          callbacks.onTranscription?.(modelTranscript, 'model');
-        }
-
-        // Handle user transcription if configured
-        // (The skill says message.serverContent?.inputAudioTranscription)
-        // Adjusting based on common schema
-        const userTranscript = (message as any).serverContent?.userTurn?.parts?.[0]?.text;
-        if (userTranscript) {
-           callbacks.onTranscription?.(userTranscript, 'user');
-        }
-
-        if (message.serverContent?.interrupted) {
-          callbacks.onInterrupted?.();
-        }
-      },
-      onclose: () => {
-        callbacks.onClose?.();
-      },
-      onerror: (error) => {
-        callbacks.onError?.(error);
+  const session = {
+    sendRealtimeInput: ({ audio }: any) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'audio', data: audio.data }));
       }
     },
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: "Zephyr" } },
-      },
-      systemInstruction,
-    },
-  });
+    close: () => {
+      ws.close();
+    }
+  };
 
-  return sessionPromise;
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      type: 'init',
+      projectName,
+      authorVoice
+    }));
+  };
+
+  ws.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.audio) callbacks.onAudioData?.(msg.audio);
+      if (msg.modelText) callbacks.onTranscription?.(msg.modelText, 'model');
+      if (msg.userText) callbacks.onTranscription?.(msg.userText, 'user');
+      if (msg.interrupted) callbacks.onInterrupted?.();
+      if (msg.closed) callbacks.onClose?.();
+    } catch (e) {}
+  };
+
+  ws.onclose = () => {
+    callbacks.onClose?.();
+  };
+
+  ws.onerror = (e) => {
+    callbacks.onError?.(e);
+  };
+
+  return session;
 }

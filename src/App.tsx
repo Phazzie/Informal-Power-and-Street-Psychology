@@ -19,18 +19,10 @@ import { Project, AnalysisResult } from './types';
 import { analyzeProject } from './services/geminiService';
 import { MessageSquare, LayoutGrid, BrainCircuit, Mic } from 'lucide-react';
 import { cn } from './lib/utils';
-import { auth, db, handleFirestoreError, OperationType } from './lib/firebase';
+import { auth, handleFirestoreError, OperationType } from './lib/firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  doc, 
-  setDoc, 
-  getDoc,
-  Timestamp,
-  orderBy
-} from 'firebase/firestore';
+import { onSnapshot } from 'firebase/firestore';
+import { getProjectsQuery, saveProject, getProjectAnalysis, saveProjectAnalysis } from './services/dbService';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -66,10 +58,7 @@ export default function App() {
     if (!user) return;
 
     const path = `users/${user.uid}/projects`;
-    const projectsRef = collection(db, 'users', user.uid, 'projects');
-    const q = query(projectsRef, orderBy('createdAt', 'desc'));
-    
-    return onSnapshot(q, (snapshot) => {
+    return onSnapshot(getProjectsQuery(user.uid), (snapshot) => {
       const projectsList: Project[] = [];
       snapshot.forEach(doc => {
         projectsList.push(doc.data() as Project);
@@ -87,14 +76,10 @@ export default function App() {
   useEffect(() => {
     if (!user || !selectedProjectId || analyses[selectedProjectId]) return;
 
-    const path = `users/${user.uid}/projects/${selectedProjectId}/analysis/latest`;
-    const analysisRef = doc(db, 'users', user.uid, 'projects', selectedProjectId, 'analysis', 'latest');
-    getDoc(analysisRef).then(snap => {
-      if (snap.exists()) {
-        setAnalyses(prev => ({ ...prev, [selectedProjectId]: snap.data() as AnalysisResult }));
+    getProjectAnalysis(user.uid, selectedProjectId).then(analysis => {
+      if (analysis) {
+        setAnalyses(prev => ({ ...prev, [selectedProjectId]: analysis }));
       }
-    }).catch(err => {
-      handleFirestoreError(err, OperationType.GET, path);
     });
   }, [user, selectedProjectId, analyses]);
 
@@ -105,17 +90,7 @@ export default function App() {
     }
 
     for (const p of newProjects) {
-      const path = `users/${user.uid}/projects/${p.id}`;
-      const projectWithMeta = {
-        ...p,
-        ownerId: user.uid,
-        createdAt: Timestamp.now().toDate().toISOString()
-      };
-      try {
-        await setDoc(doc(db, 'users', user.uid, 'projects', p.id), projectWithMeta);
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, path);
-      }
+      await saveProject(user.uid, p);
     }
     
     setIsImporting(false);
@@ -132,15 +107,12 @@ export default function App() {
     if (!user || !selectedProject || loadingProject) return;
 
     setLoadingProject(selectedProjectId);
-    const path = `users/${user.uid}/projects/${selectedProject.id}/analysis/latest`;
     try {
       const result = await analyzeProject(selectedProject);
-      const analysisRef = doc(db, 'users', user.uid, 'projects', selectedProject.id, 'analysis', 'latest');
-      await setDoc(analysisRef, result);
+      await saveProjectAnalysis(user.uid, selectedProject.id, result);
       setAnalyses(prev => ({ ...prev, [selectedProject.id]: result }));
     } catch (error) {
       console.error("Analysis failed:", error);
-      handleFirestoreError(error, OperationType.WRITE, path);
     } finally {
       setLoadingProject(null);
     }
