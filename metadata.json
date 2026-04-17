@@ -1,0 +1,6 @@
+{
+  "name": "Thesis Finder: The Pattern Analyst",
+  "description": "An interactive developmental editor for non-fiction authors. Analyzes Claude project exports to surface recurring concepts, emotional spines, and candidate thesis statements.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
