@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { Project } from '../types';
-import { Send, MessageSquare, Terminal, ChevronRight, X } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { chatWithProject } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
+import { useChat } from '../hooks/useChat';
 
 interface ChatProps {
   project: Project | null;
@@ -11,58 +11,8 @@ interface ChatProps {
   onClose: () => void;
 }
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 export function Chat({ project, isOpen, onClose }: ChatProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isTyping]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!input.trim() || !project || isTyping) return;
-
-    const userMessage: Message = { role: 'user', content: input };
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsTyping(true);
-
-    try {
-      const history = messages.map(m => ({
-        role: m.role,
-        parts: [{ text: m.content }]
-      }));
-
-      let assistantContent = '';
-      const stream = chatWithProject(project, history, input);
-      
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-      
-      for await (const chunk of stream) {
-        assistantContent += chunk;
-        setMessages(prev => {
-          const newMessages = [...prev];
-          newMessages[newMessages.length - 1].content = assistantContent;
-          return newMessages;
-        });
-      }
-    } catch (error) {
-      console.error("Chat error", error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection lost. The core is re-calibrating.' }]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
+  const { messages, input, setInput, isTyping, scrollRef, handleSubmit } = useChat(project);
 
   if (!isOpen) return null;
 

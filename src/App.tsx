@@ -15,73 +15,42 @@ import { Chat } from './components/Chat';
 import { FileImport } from './components/FileImport';
 import { Auth } from './components/Auth';
 import { VoiceSession } from './components/VoiceSession';
-import { Project, AnalysisResult } from './types';
-import { analyzeProject } from './services/geminiService';
-import { MessageSquare, LayoutGrid, BrainCircuit, Mic } from 'lucide-react';
-import { cn } from './lib/utils';
-import { auth, handleFirestoreError, OperationType } from './lib/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
-import { onSnapshot } from 'firebase/firestore';
-import { getProjectsQuery, saveProject, getProjectAnalysis, saveProjectAnalysis } from './services/dbService';
+import { Project } from './types';
+import { BrainCircuit, LayoutGrid, Mic } from 'lucide-react';
+import { saveProject } from './services/dbService';
+import { useAuth } from './hooks/useAuth';
+import { useProjects } from './hooks/useProjects';
+import { useAnalysis } from './hooks/useAnalysis';
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const { user, loading: authLoading } = useAuth();
+  
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
     return localStorage.getItem('subsurface_selected_project');
   });
+
+  const { projects } = useProjects(user?.uid);
+  const { analyses, loadingProject, triggerAnalysis, clearAnalyses } = useAnalysis(user?.uid, selectedProjectId);
+
+  const [isImporting, setIsImporting] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
 
   useEffect(() => {
     if (selectedProjectId) {
       localStorage.setItem('subsurface_selected_project', selectedProjectId);
     }
   }, [selectedProjectId]);
-  const [analyses, setAnalyses] = useState<Record<string, AnalysisResult>>({});
-  const [loadingProject, setLoadingProject] = useState<string | null>(null);
-  const [isImporting, setIsImporting] = useState(false);
-  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
 
-  // Auth Listener
+  // Auth Listener to clear state
   useEffect(() => {
-    return onAuthStateChanged(auth, (u) => {
-      setUser(u);
-      if (!u) {
-        setProjects([]);
-        setSelectedProjectId(null);
-        setAnalyses({});
-      }
-    });
-  }, []);
-
-  // Firestore Sync
-  useEffect(() => {
-    if (!user) return;
-
-    const path = `users/${user.uid}/projects`;
-    return onSnapshot(getProjectsQuery(user.uid), (snapshot) => {
-      const projectsList: Project[] = [];
-      snapshot.forEach(doc => {
-        projectsList.push(doc.data() as Project);
-      });
-      setProjects(projectsList);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, path);
-    });
-  }, [user]);
+    if (!authLoading && !user) {
+      setSelectedProjectId(null);
+      clearAnalyses();
+    }
+  }, [user, authLoading, clearAnalyses]);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null;
   const selectedAnalysis = selectedProjectId ? analyses[selectedProjectId] : null;
-
-  // Analysis Fetching
-  useEffect(() => {
-    if (!user || !selectedProjectId || analyses[selectedProjectId]) return;
-
-    getProjectAnalysis(user.uid, selectedProjectId).then(analysis => {
-      if (analysis) {
-        setAnalyses(prev => ({ ...prev, [selectedProjectId]: analysis }));
-      }
-    });
-  }, [user, selectedProjectId, analyses]);
 
   const handleImport = async (newProjects: Project[]) => {
     if (!user) {
@@ -95,26 +64,7 @@ export default function App() {
     
     setIsImporting(false);
     if (newProjects.length > 0) {
-      handleSelectProject(newProjects[0].id);
-    }
-  };
-
-  const handleSelectProject = async (id: string) => {
-    setSelectedProjectId(id);
-  };
-
-  const triggerAnalysis = async () => {
-    if (!user || !selectedProject || loadingProject) return;
-
-    setLoadingProject(selectedProjectId);
-    try {
-      const result = await analyzeProject(selectedProject);
-      await saveProjectAnalysis(user.uid, selectedProject.id, result);
-      setAnalyses(prev => ({ ...prev, [selectedProject.id]: result }));
-    } catch (error) {
-      console.error("Analysis failed:", error);
-    } finally {
-      setLoadingProject(null);
+      setSelectedProjectId(newProjects[0].id);
     }
   };
 
@@ -128,7 +78,7 @@ export default function App() {
       </button>
       {selectedProject && (
         <button 
-          onClick={triggerAnalysis}
+          onClick={() => triggerAnalysis(selectedProject)}
           disabled={loadingProject === selectedProjectId}
           className="bg-bg-card border border-border-main text-text-main px-4 py-1.5 rounded font-bold text-[0.7rem] uppercase tracking-widest hover:bg-bg-card/80 transition-all disabled:opacity-50"
         >
@@ -146,6 +96,19 @@ export default function App() {
       )}
     </div>
   ) : null;
+
+  if (authLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-bg-deep">
+        <div className="flex flex-col items-center gap-4">
+          <BrainCircuit className="w-10 h-10 text-accent-orange animate-pulse" />
+          <div className="text-accent-orange text-[0.65rem] tracking-[0.2em] uppercase font-bold animate-pulse">
+            Initializing Core...
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-[240px_1fr_300px] grid-rows-[60px_1fr] h-screen w-full bg-bg-deep font-sans overflow-hidden">
@@ -167,7 +130,7 @@ export default function App() {
         <Sidebar 
           projects={projects}
           selectedProjectId={selectedProjectId}
-          onSelectProject={handleSelectProject}
+          onSelectProject={setSelectedProjectId}
           onImport={() => setIsImporting(true)}
         />
       </nav>
@@ -176,7 +139,7 @@ export default function App() {
         {!user ? (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
              <div className="w-20 h-20 rounded-full bg-bg-card border border-border-main flex items-center justify-center">
-               < BrainCircuit className="w-10 h-10 text-accent-orange opacity-40" />
+               <BrainCircuit className="w-10 h-10 text-accent-orange opacity-40" />
              </div>
              <div className="space-y-2">
                <h1 className="text-2xl font-bold text-text-main">Welcome to Subsurface</h1>

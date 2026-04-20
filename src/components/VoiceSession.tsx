@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Mic, MicOff, X, Volume2, Power } from 'lucide-react';
-import { startLiveSession } from '../services/liveService';
-import { floatTo16BitPCM, arrayBufferToBase64 } from '../lib/audioUtils';
 import { Project } from '../types';
-import { exportAuthorVoice } from '../utils/parser';
+import { useLiveAudio } from '../hooks/useLiveAudio';
 
 interface VoiceSessionProps {
   project: Project;
@@ -11,106 +9,7 @@ interface VoiceSessionProps {
 }
 
 export function VoiceSession({ project, onClose }: VoiceSessionProps) {
-  const [isActive, setIsActive] = useState(false);
-  const [transcript, setTranscript] = useState<{ text: string, role: string }[]>([]);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sessionRef = useRef<any>(null);
-  const nextAudioTimeRef = useRef<number>(0);
-
-  const audioSourcesRef = useRef<AudioBufferSourceNode[]>([]);
-
-  const stopAllPlayback = () => {
-    audioSourcesRef.current.forEach(source => {
-      try { source.stop(); } catch (e) {}
-    });
-    audioSourcesRef.current = [];
-    if (audioContextRef.current) {
-      nextAudioTimeRef.current = audioContextRef.current.currentTime;
-    }
-  };
-
-  const startSession = async () => {
-    const authorVoice = exportAuthorVoice(project);
-
-    try {
-      audioContextRef.current = new AudioContext({ sampleRate: 16000 });
-      nextAudioTimeRef.current = audioContextRef.current.currentTime;
-
-      sessionRef.current = startLiveSession(project.name, authorVoice.slice(0, 50000), {
-        onAudioData: (base64) => {
-          playAudio(base64);
-        },
-        onTranscription: (text, role) => {
-          setTranscript(prev => [...prev, { text, role }]);
-        },
-        onInterrupted: () => {
-          stopAllPlayback();
-        },
-        onClose: () => setIsActive(false),
-        onError: (err) => console.error("Live API Error:", err)
-      });
-
-      // Microphone Capture
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
-
-      source.connect(processor);
-      processor.connect(audioContextRef.current.destination);
-
-      processor.onaudioprocess = (e) => {
-        if (!sessionRef.current) return;
-        const inputData = e.inputBuffer.getChannelData(0);
-        const pcmBuffer = floatTo16BitPCM(inputData);
-        const base64 = arrayBufferToBase64(pcmBuffer);
-        
-        sessionRef.current.sendRealtimeInput({
-          audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
-        });
-      };
-
-      setIsActive(true);
-    } catch (err) {
-      console.error("Failed to start voice session:", err);
-    }
-  };
-
-  const playAudio = async (base64: string) => {
-    if (!audioContextRef.current) return;
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    const pcmData = new Int16Array(bytes.buffer);
-    const floatData = new Float32Array(pcmData.length);
-    for (let i = 0; i < pcmData.length; i++) {
-        floatData[i] = pcmData[i] / 0x8000;
-    }
-
-    const audioBuffer = audioContextRef.current.createBuffer(1, floatData.length, 16000);
-    audioBuffer.getChannelData(0).set(floatData);
-
-    const source = audioContextRef.current.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(audioContextRef.current.destination);
-    
-    source.onended = () => {
-      audioSourcesRef.current = audioSourcesRef.current.filter(s => s !== source);
-    };
-    audioSourcesRef.current.push(source);
-
-    const startTime = Math.max(audioContextRef.current.currentTime, nextAudioTimeRef.current);
-    source.start(startTime);
-    nextAudioTimeRef.current = startTime + audioBuffer.duration;
-  };
-
-  useEffect(() => {
-    return () => {
-      audioContextRef.current?.close();
-      sessionRef.current?.close();
-    };
-  }, []);
+  const { isActive, transcript, startSession, endSession } = useLiveAudio(project);
 
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/95">
@@ -182,9 +81,7 @@ export function VoiceSession({ project, onClose }: VoiceSessionProps) {
            {isActive && (
              <button 
               onClick={() => {
-                sessionRef.current?.close();
-                audioContextRef.current?.close();
-                setIsActive(false);
+                endSession();
               }}
               className="text-text-dim/40 hover:text-red-500 transition-colors flex items-center gap-2 uppercase text-[0.7rem] font-bold tracking-widest"
              >
