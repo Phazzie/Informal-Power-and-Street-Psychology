@@ -61,17 +61,21 @@ export function AppLayout({
                   {selectedProject.name}
                 </h1>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2" role="group" aria-label="Project actions">
                 <button
                   onClick={() => setIsVoiceOpen(true)}
+                  aria-label="Start live voice sync session"
+                  aria-expanded={isVoiceOpen}
                   className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-text-dim hover:text-accent-orange border border-transparent hover:border-border-main rounded transition-all bg-bg-deep/50 hover:bg-bg-deep"
                 >
-                  <Mic className="w-3.5 h-3.5" />
+                  <Mic className="w-3.5 h-3.5" aria-hidden="true" />
                   Live Sync
                 </button>
                 <button
                   onClick={() => onTriggerAnalysis(selectedProject)}
                   disabled={loadingProject === selectedProject.id}
+                  aria-label={loadingProject === selectedProject.id ? "Analyzing project..." : "Run project analysis"}
+                  aria-busy={loadingProject === selectedProject.id}
                   className={cn(
                     "flex items-center gap-2 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider rounded transition-all",
                     loadingProject === selectedProject.id
@@ -81,12 +85,12 @@ export function AppLayout({
                 >
                   {loadingProject === selectedProject.id ? (
                     <div className="flex items-center gap-2">
-                      <div className="w-3.5 h-3.5 border-2 border-text-dim border-t-transparent rounded-full animate-spin" />
+                      <div className="w-3.5 h-3.5 border-2 border-text-dim border-t-transparent rounded-full animate-spin" aria-hidden="true" />
                       Parsing...
                     </div>
                   ) : (
                     <>
-                      <LayoutGrid className="w-3.5 h-3.5" />
+                      <LayoutGrid className="w-3.5 h-3.5" aria-hidden="true" />
                       Analyze
                     </>
                   )}

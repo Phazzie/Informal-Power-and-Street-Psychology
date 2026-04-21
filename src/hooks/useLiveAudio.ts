@@ -1,17 +1,20 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { floatTo16BitPCM, arrayBufferToBase64 } from '../lib/audioUtils';
-import { startLiveSession } from '../services/liveService';
 import { Project } from '../types';
 import { exportAuthorVoice } from '../utils/parser';
+import { useDependencies } from '../core/di/DIContext';
 
 export function useLiveAudio(project: Project) {
   const [isActive, setIsActive] = useState(false);
   const [transcript, setTranscript] = useState<{ text: string, role: string }[]>([]);
   
+  const { media, realtime } = useDependencies();
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const sessionRef = useRef<any>(null);
   const nextAudioTimeRef = useRef<number>(0);
   const audioSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const rawStreamRef = useRef<MediaStream | null>(null);
 
   const stopAllPlayback = useCallback(() => {
     audioSourcesRef.current.forEach(source => {
@@ -60,7 +63,7 @@ export function useLiveAudio(project: Project) {
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
       nextAudioTimeRef.current = audioContextRef.current.currentTime;
 
-      sessionRef.current = startLiveSession(project.name, authorVoice.slice(0, 50000), {
+      sessionRef.current = realtime.startLiveSession(project.name, authorVoice.slice(0, 50000), {
         onAudioData: playAudio,
         onTranscription: (text, role) => {
           setTranscript(prev => [...prev, { text, role }]);
@@ -70,7 +73,8 @@ export function useLiveAudio(project: Project) {
         onError: (err) => console.error("Live API Error:", err)
       });
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await media.requestMicrophone();
+      rawStreamRef.current = stream;
       const source = audioContextRef.current.createMediaStreamSource(stream);
       const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
@@ -84,7 +88,7 @@ export function useLiveAudio(project: Project) {
         const base64 = arrayBufferToBase64(pcmBuffer);
         
         sessionRef.current.sendRealtimeInput({
-          audio: { data: base64, mimeType: 'audio/pcm;rate=16000' }
+          data: base64, mimeType: 'audio/pcm;rate=16000'
         });
       };
 
@@ -97,8 +101,12 @@ export function useLiveAudio(project: Project) {
   const endSession = useCallback(() => {
     sessionRef.current?.close();
     audioContextRef.current?.close();
+    if (rawStreamRef.current) {
+      media.releaseStream(rawStreamRef.current);
+      rawStreamRef.current = null;
+    }
     setIsActive(false);
-  }, []);
+  }, [media]);
 
   useEffect(() => {
     return endSession;

@@ -1,10 +1,27 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { AIService } from './aiService';
+import { consumeTicket } from './ticketCache';
 
 export function setupWebSocket(server: any) {
   const wss = new WebSocketServer({ server, path: '/api/live' });
 
-  wss.on('connection', (ws: WebSocket) => {
+  wss.on('connection', (ws: WebSocket, req) => {
+    
+    // Parse WS query string for ticket
+    const url = new URL(req.url!, `http://${req.headers.host}`);
+    const ticket = url.searchParams.get('ticket');
+    
+    if (!ticket) {
+      ws.close(1008, 'Unauthorized: Missing ticket');
+      return;
+    }
+    
+    const userId = consumeTicket(ticket);
+    if (!userId) {
+      ws.close(1008, 'Unauthorized: Invalid or expired ticket');
+      return;
+    }
+
     let aiSession: any = null;
 
     ws.on('message', async (data) => {

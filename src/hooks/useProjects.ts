@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Project } from '../types';
-import { getProjectsQuery } from '../services/dbService';
-import { handleFirestoreError, OperationType } from '../lib/firebase';
-import { onSnapshot } from 'firebase/firestore';
+import { useDependencies } from '../core/di/DIContext';
 
 export function useProjects(userId: string | undefined) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const { storage } = useDependencies();
 
   useEffect(() => {
     if (!userId) {
@@ -13,17 +12,16 @@ export function useProjects(userId: string | undefined) {
       return;
     }
 
-    const path = `users/${userId}/projects`;
-    return onSnapshot(getProjectsQuery(userId), (snapshot) => {
-      const projectsList: Project[] = [];
-      snapshot.forEach(doc => {
-        projectsList.push(doc.data() as Project);
-      });
-      setProjects(projectsList);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, path);
-    });
-  }, [userId]);
+    const unsubscribe = storage.subscribeToProjects(
+      userId,
+      (projectsList) => setProjects(projectsList),
+      (error) => console.error("Error subscribing to projects:", error)
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [userId, storage]);
 
   return { projects, setProjects };
 }

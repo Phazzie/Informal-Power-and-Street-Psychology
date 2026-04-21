@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { AnalysisDashboard } from './components/AnalysisDashboard';
 import { Chat } from './components/Chat';
@@ -17,61 +17,60 @@ import { Auth } from './components/Auth';
 import { VoiceSession } from './components/VoiceSession';
 import { Project } from './types';
 import { BrainCircuit, LayoutGrid, Mic } from 'lucide-react';
-import { saveProject } from './services/dbService';
 import { useAuth } from './hooks/useAuth';
 import { useProjects } from './hooks/useProjects';
 import { useAnalysis } from './hooks/useAnalysis';
+import { useDependencies } from './core/di/DIContext';
+import { useAppState } from './core/state/AppContext';
+import { toast } from 'react-toastify';
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
-  
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() => {
-    return localStorage.getItem('subsurface_selected_project');
-  });
+  const { storage } = useDependencies();
+  const { state, dispatch } = useAppState();
+
+  const { selectedProjectId, isImporting, isVoiceOpen } = state;
 
   const { projects } = useProjects(user?.uid);
   const { analyses, loadingProject, triggerAnalysis, clearAnalyses } = useAnalysis(user?.uid, selectedProjectId);
 
-  const [isImporting, setIsImporting] = useState(false);
-  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
-
-  useEffect(() => {
-    if (selectedProjectId) {
-      localStorage.setItem('subsurface_selected_project', selectedProjectId);
-    }
-  }, [selectedProjectId]);
-
   // Auth Listener to clear state
   useEffect(() => {
     if (!authLoading && !user) {
-      setSelectedProjectId(null);
+      dispatch({ type: 'SET_PROJECT', payload: null });
       clearAnalyses();
     }
-  }, [user, authLoading, clearAnalyses]);
+  }, [user, authLoading, clearAnalyses, dispatch]);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || null;
   const selectedAnalysis = selectedProjectId ? analyses[selectedProjectId] : null;
 
-  const handleImport = async (newProjects: Project[]) => {
+  const handleImport = useCallback(async (newProjects: Project[]) => {
     if (!user) {
-      alert("Please sign in to save your material.");
+      toast.error("Please sign in to save your material.");
       return;
     }
 
-    for (const p of newProjects) {
-      await saveProject(user.uid, p);
+    try {
+      const toastId = toast.loading("Saving material to database...");
+      for (const p of newProjects) {
+        await storage.saveProject(user.uid, p);
+      }
+      toast.update(toastId, { render: "Material imported successfully.", type: "success", isLoading: false, autoClose: 3000 });
+      
+      dispatch({ type: 'CLOSE_IMPORT' });
+      if (newProjects.length > 0) {
+        dispatch({ type: 'SET_PROJECT', payload: newProjects[0].id });
+      }
+    } catch (e: any) {
+      toast.error(`Failed to import: ${e.message}`);
     }
-    
-    setIsImporting(false);
-    if (newProjects.length > 0) {
-      setSelectedProjectId(newProjects[0].id);
-    }
-  };
+  }, [user, storage, dispatch]);
 
   const projectsInHeader = user ? (
     <div className="flex items-center gap-3">
       <button 
-        onClick={() => setIsImporting(true)}
+        onClick={() => dispatch({ type: 'OPEN_IMPORT' })}
         className="bg-accent-orange text-white px-4 py-1.5 rounded font-bold text-[0.7rem] uppercase tracking-widest hover:brightness-110 transition-all cursor-pointer"
       >
         Import Material
@@ -87,7 +86,7 @@ export default function App() {
       )}
       {selectedProject && (
         <button 
-          onClick={() => setIsVoiceOpen(true)}
+          onClick={() => dispatch({ type: 'OPEN_VOICE' })}
           className="flex items-center gap-2 bg-accent-orange/10 border border-accent-orange/20 text-accent-orange px-4 py-1.5 rounded font-bold text-[0.7rem] uppercase tracking-widest hover:bg-accent-orange/20 transition-all"
         >
           <Mic className="w-3.5 h-3.5" />
@@ -130,8 +129,8 @@ export default function App() {
         <Sidebar 
           projects={projects}
           selectedProjectId={selectedProjectId}
-          onSelectProject={setSelectedProjectId}
-          onImport={() => setIsImporting(true)}
+          onSelectProject={(id: string) => dispatch({ type: 'SET_PROJECT', payload: id })}
+          onImport={() => dispatch({ type: 'OPEN_IMPORT' })}
         />
       </nav>
 
@@ -197,14 +196,14 @@ export default function App() {
       {isImporting && (
         <FileImport 
           onImport={handleImport}
-          onClose={() => setIsImporting(false)}
+          onClose={() => dispatch({ type: 'CLOSE_IMPORT' })}
         />
       )}
 
       {isVoiceOpen && selectedProject && (
         <VoiceSession 
           project={selectedProject}
-          onClose={() => setIsVoiceOpen(false)}
+          onClose={() => dispatch({ type: 'CLOSE_VOICE' })}
         />
       )}
     </div>
