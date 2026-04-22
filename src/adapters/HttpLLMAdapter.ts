@@ -1,16 +1,16 @@
 import { ILLMPort, LLMRequestOptions } from '../core/ports/ILLMPort';
 import { ConversationMessage } from '../types';
-import { exportAuthorVoice } from '../utils/parser';
-import { getAuth } from 'firebase/auth';
+import { IAuthPort } from '../core/ports/IAuthPort';
+import { APP_CONSTANTS } from '../core/config/constants';
 
 export class HttpLLMAdapter implements ILLMPort {
+  constructor(private authPort: IAuthPort) {}
   
   private async getAuthHeaders(): Promise<Record<string, string>> {
-     const auth = getAuth();
-     if (!auth.currentUser) {
+     const token = await this.authPort.getSessionToken();
+     if (!token) {
        throw new Error("Unauthorized: Please sign in.");
      }
-     const token = await auth.currentUser.getIdToken();
      return {
        'Content-Type': 'application/json',
        'Authorization': `Bearer ${token}`
@@ -20,7 +20,7 @@ export class HttpLLMAdapter implements ILLMPort {
   async analyzeMaterial(authorVoice: string, options?: LLMRequestOptions): Promise<any> {
     const headers = await this.getAuthHeaders();
     
-    const res = await fetch('/api/analyze', {
+    const res = await fetch(APP_CONSTANTS.API_ROUTES.ANALYZE, {
       method: 'POST',
       headers,
       body: JSON.stringify({ authorVoice }),
@@ -38,7 +38,7 @@ export class HttpLLMAdapter implements ILLMPort {
   async *streamChat(projectName: string, authorVoice: string, history: ConversationMessage[], message: string, options?: LLMRequestOptions): AsyncGenerator<string, void, unknown> {
     const headers = await this.getAuthHeaders();
 
-    const res = await fetch('/api/chat', {
+    const res = await fetch(APP_CONSTANTS.API_ROUTES.CHAT, {
       method: 'POST',
       headers,
       body: JSON.stringify({ 

@@ -2,6 +2,7 @@ import { collection, doc, query, orderBy, setDoc, getDoc, serverTimestamp, Times
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { Project, AnalysisResult } from '../types';
 import { IStoragePort } from '../core/ports/IStoragePort';
+import { ProjectEntity } from '../domain/ProjectEntity';
 
 export class FirebaseStorageAdapter implements IStoragePort {
   generateId(): string {
@@ -15,8 +16,10 @@ export class FirebaseStorageAdapter implements IStoragePort {
 
     return onSnapshot(q, (snapshot) => {
       const projectsList: Project[] = [];
-      snapshot.forEach(doc => {
-        projectsList.push(doc.data() as Project);
+      snapshot.forEach(document => {
+        // Uncle Bob Audit #6: Anemic Domain Hydration
+        const raw = document.data() as Project;
+        projectsList.push(ProjectEntity.fromDTO(raw));
       });
       onUpdate(projectsList);
     }, (error) => {
@@ -33,7 +36,8 @@ export class FirebaseStorageAdapter implements IStoragePort {
       const snap = await getDocs(q);
       const projectsList: Project[] = [];
       snap.forEach(document => {
-        projectsList.push(document.data() as Project);
+        const raw = document.data() as Project;
+        projectsList.push(ProjectEntity.fromDTO(raw));
       });
       return projectsList;
     } catch (err) {
@@ -44,8 +48,12 @@ export class FirebaseStorageAdapter implements IStoragePort {
 
   async saveProject(userId: string, project: Project): Promise<void> {
     const path = `users/${userId}/projects/${project.id}`;
+    
+    // Protect encapsulation if it is an instance
+    const cleanDto = project instanceof ProjectEntity ? (project as ProjectEntity).toDTO() : project;
+
     const projectWithMeta = {
-      ...project,
+      ...cleanDto,
       ownerId: userId,
       createdAt: Timestamp.now().toDate().toISOString()
     };

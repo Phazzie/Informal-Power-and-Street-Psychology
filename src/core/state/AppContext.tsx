@@ -30,35 +30,52 @@ function appReducer(state: AppState, action: AppAction): AppState {
   }
 }
 
+// Uncle Bob Audit #9: DRY. Extract Magic String
+const LOCAL_STORAGE_KEY = 'subsurface_selected_project';
+
 const getInitialState = (): AppState => {
   if (typeof window === 'undefined') {
     return { selectedProjectId: null, isImporting: false, isVoiceOpen: false };
   }
   return {
-    selectedProjectId: localStorage.getItem('subsurface_selected_project'),
+    selectedProjectId: localStorage.getItem(LOCAL_STORAGE_KEY),
     isImporting: false,
     isVoiceOpen: false,
   };
 };
 
-const AppContext = createContext<{ state: AppState; dispatch: React.Dispatch<AppAction> } | undefined>(undefined);
+// Uncle Bob Audit #7: Split Context to prevent Re-render Avalanche
+const AppStateContext = createContext<AppState | undefined>(undefined);
+const AppDispatchContext = createContext<React.Dispatch<AppAction> | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, getInitialState());
 
   useEffect(() => {
     if (state.selectedProjectId) {
-      localStorage.setItem('subsurface_selected_project', state.selectedProjectId);
+      localStorage.setItem(LOCAL_STORAGE_KEY, state.selectedProjectId);
     } else {
-      localStorage.removeItem('subsurface_selected_project');
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   }, [state.selectedProjectId]);
 
-  return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
+  return (
+    <AppStateContext.Provider value={state}>
+      <AppDispatchContext.Provider value={dispatch}>
+        {children}
+      </AppDispatchContext.Provider>
+    </AppStateContext.Provider>
+  );
 }
 
 export function useAppState() {
-  const context = useContext(AppContext);
+  const context = useContext(AppStateContext);
   if (!context) throw new Error('useAppState must be used within AppProvider');
+  return context;
+}
+
+export function useAppDispatch() {
+  const context = useContext(AppDispatchContext);
+  if (!context) throw new Error('useAppDispatch must be used within AppProvider');
   return context;
 }

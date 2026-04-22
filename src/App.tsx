@@ -16,18 +16,22 @@ import { FileImport } from './components/FileImport';
 import { Auth } from './components/Auth';
 import { VoiceSession } from './components/VoiceSession';
 import { Project } from './types';
-import { BrainCircuit, LayoutGrid, Mic } from 'lucide-react';
+import { BrainCircuit, Mic } from 'lucide-react';
 import { useAuth } from './hooks/useAuth';
 import { useProjects } from './hooks/useProjects';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useDependencies } from './core/di/DIContext';
-import { useAppState } from './core/state/AppContext';
+import { useAppState, useAppDispatch } from './core/state/AppContext';
 import { toast } from 'react-toastify';
+
+import { WelcomeView } from './components/WelcomeView';
+import { EmptyProjectView } from './components/EmptyProjectView';
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
   const { storage } = useDependencies();
-  const { state, dispatch } = useAppState();
+  const state = useAppState();
+  const dispatch = useAppDispatch();
 
   const { selectedProjectId, isImporting, isVoiceOpen } = state;
 
@@ -64,11 +68,11 @@ export default function App() {
       for (const p of newProjects) {
         // Fire-and-forget background upload using offline-capable Firestore Adapter
         storage.saveProject(user.uid, p).catch(e => {
-          toast.error(`Background upload failed for ${p.name}: ${e.message}`);
+          toast.error(`Background upload failed for ${p.name}: ${(e as Error).message}`);
         });
       }
-    } catch (e: any) {
-      toast.error(`Failed to dispatch import: ${e.message}`);
+    } catch (e: unknown) {
+      toast.error(`Failed to dispatch import: ${(e as Error).message}`);
     }
   }, [user, storage, dispatch]);
 
@@ -141,18 +145,7 @@ export default function App() {
 
       <main className="flex flex-col relative h-full overflow-hidden bg-bg-deep p-6 gap-6">
         {!user ? (
-          <div className="h-full flex flex-col items-center justify-center text-center space-y-6">
-             <div className="w-20 h-20 rounded-full bg-bg-card border border-border-main flex items-center justify-center">
-               <BrainCircuit className="w-10 h-10 text-accent-orange opacity-40" />
-             </div>
-             <div className="space-y-2">
-               <h1 className="text-2xl font-bold text-text-main">Welcome to Subsurface</h1>
-               <p className="text-sm text-text-dim/60 max-w-sm">
-                 Please sign in to begin analyzing your creative material and find the patterns that hide who you are.
-               </p>
-             </div>
-             <Auth user={null} />
-          </div>
+          <WelcomeView />
         ) : selectedProject ? (
           <>
             <div className="flex items-end justify-between shrink-0">
@@ -173,20 +166,7 @@ export default function App() {
             </div>
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center">
-            <div className="space-y-6 max-w-lg">
-              <div className="relative inline-block">
-                <LayoutGrid className="w-16 h-16 text-white/5 mx-auto" />
-                <div className="absolute inset-0 bg-accent-orange/10 blur-2xl rounded-full" />
-              </div>
-              <div className="space-y-2">
-                <h1 className="text-3xl font-bold tracking-tight text-white">Select Project</h1>
-                <p className="text-text-dim leading-relaxed text-sm">
-                  Import or select a research project to begin subsurface pattern parsing.
-                </p>
-              </div>
-            </div>
-          </div>
+          <EmptyProjectView />
         )}
       </main>
 

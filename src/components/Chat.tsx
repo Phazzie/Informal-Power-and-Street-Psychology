@@ -65,7 +65,12 @@ export function Chat({ project, isOpen, onClose }: ChatProps) {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit(e as any)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+               e.preventDefault();
+               handleSubmit();
+            }
+          }}
           placeholder="Dig deeper into the material..."
           className="w-full bg-bg-deep border border-border-main px-4 py-2.5 rounded-md text-[0.85rem] text-text-dim placeholder:text-text-dim/30 outline-none focus:border-accent-orange/50 transition-colors"
           aria-label="Chat input"

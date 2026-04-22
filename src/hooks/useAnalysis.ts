@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnalysisResult, Project } from '../types';
 import { useDependencies } from '../core/di/DIContext';
 import { toast } from 'react-toastify';
+import { ProjectEntity } from '../domain/ProjectEntity';
 
 export function useAnalysis(userId: string | undefined, selectedProjectId: string | null) {
   const [analyses, setAnalyses] = useState<Record<string, AnalysisResult>>({});
@@ -41,10 +42,10 @@ export function useAnalysis(userId: string | undefined, selectedProjectId: strin
     setLoadingProject(project.id);
     const toastId = toast.loading(`Refreshing structural lens on ${project.name}...`);
     try {
-      const authorVoice = project.conversations.map(c => c.messages.map(m => m.content).join('\n')).join('\n'); // extracted to avoid coupling to original parser right now, though LLM adapter handles it? No wait, llm adapter takes raw author voice. Let's make LLM adapter handle it or we do it here. 
-      // Actually we have exportAuthorVoice exported from parser, let's use that to be strictly identical
-      const { exportAuthorVoice } = await import('../utils/parser');
-      const voice = exportAuthorVoice(project);
+      // Use properly instantiated Domain Entity to get the voice payload safely
+      // The parameter might be a raw DTO right now so convert it just in case
+      const projectEntity = project instanceof ProjectEntity ? project : ProjectEntity.fromDTO(project);
+      const voice = projectEntity.getAuthorVoiceBlob();
       
       const result = await llm.analyzeMaterial(voice, { signal: abortControllerRef.current.signal });
       await storage.saveAnalysis(userId, project.id, result);

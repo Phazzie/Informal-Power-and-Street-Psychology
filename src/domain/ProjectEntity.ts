@@ -1,4 +1,5 @@
 import { Conversation, ConversationMessage, Project } from '../types';
+import { APP_CONSTANTS } from '../core/config/constants';
 
 export class ProjectEntity implements Project {
   public id: string;
@@ -15,7 +16,7 @@ export class ProjectEntity implements Project {
   }
 
   static fromDTO(dto: Project): ProjectEntity {
-    return new ProjectEntity(dto.id, dto.name, dto.conversations);
+    return new ProjectEntity(dto.id, dto.name, dto.conversations || []);
   }
 
   toDTO(): Project {
@@ -50,7 +51,18 @@ export class ProjectEntity implements Project {
     convo.messages.push(message);
   }
 
-  // Immutable clone for React State updates
+  // Centralized Voice Extraction (Audit #4.4)
+  getAuthorVoiceBlob(): string {
+    const rawVoice = this.conversations
+      .flatMap(c => c.messages)
+      .filter(m => m.role === APP_CONSTANTS.ROLES.USER)
+      .map(m => m.content)
+      .join('\n\n---NEXT---\n\n');
+      
+    // Enforce limits early safely
+    return rawVoice.slice(-APP_CONSTANTS.LIMITS.MAX_AUTHOR_VOICE_BYTES);
+  }
+
   clone(): ProjectEntity {
     // Deep clone the conversations array to prevent accidental mutations
     const clonedConvos = JSON.parse(JSON.stringify(this.conversations));

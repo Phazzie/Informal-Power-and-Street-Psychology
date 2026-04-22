@@ -3,18 +3,14 @@ import { AnalysisResult, AnalysisLens, Project } from '../types';
 import { 
   Search, 
   Lightbulb, 
-  AlertCircle, 
   Layers, 
-  BookOpen, 
-  GitBranch, 
-  Sparkles, 
-  Heart, 
-  Zap, 
-  Milestone
+  Sparkles
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import ReactMarkdown from 'react-markdown';
 import { motion, AnimatePresence } from 'motion/react';
+import { CoreMaterialTab } from './dashboard/CoreMaterialTab';
+import { ConventionalTab } from './dashboard/ConventionalTab';
+import { UnconventionalTab } from './dashboard/UnconventionalTab';
 
 interface AnalysisDashboardProps {
   project: Project;
@@ -90,151 +86,12 @@ export function AnalysisDashboard({ project, analysis, loading }: AnalysisDashbo
             transition={{ duration: 0.2 }}
             className="grid grid-cols-1 md:grid-cols-2 gap-6"
           >
-            {activeLens === 'default' && (
-              <>
-                <Section title="Material Summary" icon={BookOpen} className="col-span-full">
-                  <div className="glass-panel p-6 prose prose-invert max-w-none text-text-dim leading-relaxed font-sans text-sm">
-                    <ReactMarkdown>{analysis.materialSummary}</ReactMarkdown>
-                  </div>
-                </Section>
-
-                <Section title="The Author's Own Lines" icon={Zap} className="col-span-full">
-                  <div className="space-y-4">
-                    {analysis.authorLines.map((line, i) => (
-                      <div key={i} className="glass-panel p-6">
-                        <div className="flex justify-between items-start gap-4 mb-2">
-                          <div className="lens-name text-[0.7rem] uppercase font-bold text-accent-orange">Analysis / Line {i+1}</div>
-                          <span className="text-[10px] font-bold text-accent-orange bg-accent-muted px-2 py-0.5 rounded">
-                            Resonance: {line.resonance}/10
-                          </span>
-                        </div>
-                        <p className="author-quote m-0 italic">"{line.line}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="What's Underdeveloped" icon={AlertCircle} className="col-span-full">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {analysis.underdevelopedIdeas.map((idea, i) => (
-                      <div key={i} className="glass-panel p-6 space-y-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-accent-orange text-[0.7rem] font-bold uppercase tracking-widest">DROPPED PATTERN</span>
-                        </div>
-                        <h4 className="text-text-main font-bold text-sm tracking-tight">{idea.concept}</h4>
-                        <div className="space-y-2">
-                          <div className="text-[0.75rem] text-text-dim/60 italic leading-snug">
-                            <span className="text-accent-muted not-italic font-bold text-[0.65rem] uppercase mr-2.5">Initial Intro</span>
-                            {idea.initialIntroduction}
-                          </div>
-                          <div className="text-[0.75rem] text-text-dim leading-relaxed">
-                            <span className="text-accent-muted font-bold text-[0.65rem] uppercase mr-2.5">Gap</span>
-                            {idea.lackOfFollowThrough}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-              </>
-            )}
-
-            {activeLens === 'conventional' && (
-              <>
-                <Section title="Concept Frequency Map" icon={Layers}>
-                  <div className="glass-panel p-6 prose prose-invert prose-sm max-w-none text-text-dim">
-                    <ReactMarkdown>{analysis.conventional.conceptMap}</ReactMarkdown>
-                  </div>
-                </Section>
-
-                <Section title="Story Inventory" icon={Milestone}>
-                  <div className="glass-panel p-6 prose prose-invert prose-sm max-w-none text-text-dim">
-                    <ReactMarkdown>{analysis.conventional.storyInventory}</ReactMarkdown>
-                  </div>
-                </Section>
-
-                <Section title="Gap Analysis" icon={Search} className="col-span-full">
-                  <div className="glass-panel p-6 border-l-4 border-l-accent-muted prose prose-invert prose-sm max-w-none text-text-dim">
-                    <ReactMarkdown>{analysis.conventional.gapAnalysis}</ReactMarkdown>
-                  </div>
-                </Section>
-              </>
-            )}
-
-            {activeLens === 'unconventional' && (
-              <>
-                <Section title="Throwaway Line Detector" icon={Zap} className="col-span-full">
-                  <div className="space-y-4">
-                    {analysis.unconventional.throwawayLines.map((line, i) => (
-                      <div key={i} className="glass-panel p-6">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="lens-name text-[0.7rem] uppercase font-bold text-accent-orange tracking-widest">SIDELONG INSIGHT</div>
-                          <div className="thesis-badge">THESIS CANDIDATE</div>
-                        </div>
-                        <p className="author-quote m-0">"{line}"</p>
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-
-                <Section title="Emotional Spine" icon={Heart}>
-                  <div className="glass-panel p-6 prose prose-invert prose-sm max-w-none text-text-dim">
-                    <ReactMarkdown>{analysis.unconventional.emotionalSpine}</ReactMarkdown>
-                  </div>
-                </Section>
-
-                <Section title="Contradiction Finder" icon={GitBranch}>
-                  <div className="glass-panel p-6 prose prose-invert prose-sm max-w-none text-text-dim">
-                    <ReactMarkdown>{analysis.unconventional.contradictions}</ReactMarkdown>
-                  </div>
-                </Section>
-
-                <Section title="Candidate Thesis Generator" icon={Sparkles} className="col-span-full">
-                  <div className="space-y-6">
-                    {analysis.unconventional.candidateTheses.map((thesis, i) => (
-                      <div key={i} className="glass-panel p-8 space-y-4 border-t-2 border-t-accent-muted">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-accent-orange" />
-                            <div className="text-[0.7rem] uppercase font-bold text-accent-orange">Candidate {i+1}</div>
-                          </div>
-                          <div className="thesis-badge text-[0.6rem]">SIDELONG INSIGHT</div>
-                        </div>
-                        <h4 className="text-xl font-normal text-white leading-snug tracking-tight">"{thesis.statement}"</h4>
-                        
-                        <div className="space-y-4 pt-4 border-t section-border">
-                          <div>
-                            <p className="text-[10px] uppercase font-bold text-text-dim/40 mb-2">Original Context</p>
-                            <p className="text-[0.85rem] text-text-dim/60 italic leading-relaxed font-serif">
-                              ...{thesis.originalContext}...
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] uppercase font-bold text-text-dim/40 mb-2">Supportive Evidence</p>
-                            <p className="text-[0.85rem] text-text-dim leading-relaxed">{thesis.support}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </Section>
-              </>
-            )}
+            {activeLens === 'default' && <CoreMaterialTab analysis={analysis} />}
+            {activeLens === 'conventional' && <ConventionalTab analysis={analysis} />}
+            {activeLens === 'unconventional' && <UnconventionalTab analysis={analysis} />}
           </motion.div>
         </AnimatePresence>
       </div>
-    </div>
-  );
-}
-
-function Section({ title, icon: Icon, children, className }: { title: string; icon: any; children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn("space-y-4", className)}>
-      <div className="flex items-center gap-3 px-2">
-        <Icon className="w-4 h-4 text-accent-orange opacity-60" />
-        <h3 className="text-[0.75rem] font-bold uppercase tracking-widest text-text-dim/60">{title}</h3>
-      </div>
-      {children}
     </div>
   );
 }

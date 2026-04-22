@@ -1,8 +1,10 @@
 import { IRealtimePort, IRealtimeSession, LiveSessionCallbacks } from '../core/ports/IRealtimePort';
-import { getAuth } from 'firebase/auth';
+import { IAuthPort } from '../core/ports/IAuthPort';
+import { APP_CONSTANTS } from '../core/config/constants';
 
 export class WebsocketRealtimeAdapter implements IRealtimePort {
-  
+  constructor(private authPort: IAuthPort) {}
+
   startLiveSession(projectName: string, authorVoice: string, callbacks: LiveSessionCallbacks): IRealtimeSession {
     let ws: WebSocket | null = null;
     let isClosed = false;
@@ -23,13 +25,12 @@ export class WebsocketRealtimeAdapter implements IRealtimePort {
 
     const initialize = async () => {
       try {
-        const auth = getAuth();
-        if (!auth.currentUser) {
+        const token = await this.authPort.getSessionToken();
+        if (!token) {
           throw new Error("Unauthorized: Please sign in.");
         }
         
-        const token = await auth.currentUser.getIdToken();
-        const ticketRes = await fetch('/api/live/ticket', {
+        const ticketRes = await fetch(APP_CONSTANTS.API_ROUTES.LIVE_TICKET, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -46,7 +47,7 @@ export class WebsocketRealtimeAdapter implements IRealtimePort {
         if (isClosed) return; // Closed before ticket was fetched
 
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/api/live?ticket=${ticket}`;
+        const wsUrl = `${protocol}//${window.location.host}${APP_CONSTANTS.API_ROUTES.LIVE_WS}?ticket=${ticket}`;
         
         ws = new WebSocket(wsUrl);
 
@@ -62,8 +63,8 @@ export class WebsocketRealtimeAdapter implements IRealtimePort {
           try {
             const msg = JSON.parse(event.data);
             if (msg.audio) callbacks.onAudioData?.(msg.audio);
-            if (msg.modelText) callbacks.onTranscription?.(msg.modelText, 'model');
-            if (msg.userText) callbacks.onTranscription?.(msg.userText, 'user');
+            if (msg.modelText) callbacks.onTranscription?.(msg.modelText, APP_CONSTANTS.ROLES.MODEL);
+            if (msg.userText) callbacks.onTranscription?.(msg.userText, APP_CONSTANTS.ROLES.USER);
             if (msg.interrupted) callbacks.onInterrupted?.();
             if (msg.closed) callbacks.onClose?.();
           } catch (e) {}

@@ -7,6 +7,16 @@ interface TicketData {
 
 const ticketCache = new Map<string, TicketData>();
 
+// Uncle Bob Audit #1: Prevent OOM by burning unconsumed, expired tickets every 60s
+setInterval(() => {
+  const now = Date.now();
+  for (const [ticket, data] of ticketCache.entries()) {
+    if (data.expiresAt < now) {
+      ticketCache.delete(ticket);
+    }
+  }
+}, 60000);
+
 export const generateTicket = (userId: string): string => {
   const ticket = uuidv4();
   // Ticket expires in 30 seconds

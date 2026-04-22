@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { floatTo16BitPCM, arrayBufferToBase64 } from '../lib/audioUtils';
 import { Project } from '../types';
-import { exportAuthorVoice } from '../utils/parser';
+import { ProjectEntity } from '../domain/ProjectEntity';
 import { useDependencies } from '../core/di/DIContext';
 
 export function useLiveAudio(project: Project) {
@@ -57,7 +57,8 @@ export function useLiveAudio(project: Project) {
   }, []);
 
   const startSession = async () => {
-    const authorVoice = exportAuthorVoice(project);
+    const projectEntity = project instanceof ProjectEntity ? project : ProjectEntity.fromDTO(project);
+    const authorVoice = projectEntity.getAuthorVoiceBlob();
 
     try {
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });

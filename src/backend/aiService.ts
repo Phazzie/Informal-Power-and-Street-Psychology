@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type, Modality } from '@google/genai';
+import { ENV } from '../core/config/environment';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+const ai = new GoogleGenAI({ apiKey: ENV.GEMINI_API_KEY });
 
 const SYSTEM_INSTRUCTION = `You are a world-class developmental editor and pattern analyst. 
 You are working with an author writing a nonfiction book about informal power, social intelligence, and psychological technique.
@@ -80,10 +81,11 @@ const analysisSchema = {
   required: ["materialSummary", "authorLines", "underdevelopedIdeas", "conventional", "unconventional"]
 };
 
-export class AIService {
+// Fragmenting the AIService God Object into TextAIService and LiveAIService
+export class TextAIService {
   public static async analyzeMaterial(authorVoice: string) {
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-preview",
+      model: ENV.MODELS.TEXT_FLASH,
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: "application/json",
@@ -96,29 +98,33 @@ export class AIService {
     return JSON.parse(response.text || '{}');
   }
 
-  public static async createChatSession(projectName: string, authorVoice: string, history: any[]) {
+  // Uncle Bob Audit #8: Better typing instead of any[]
+  public static async createChatSession(projectName: string, authorVoice: string, history: Array<{role: string, parts: Array<{text: string}>}>) {
     const context = `Context: This is a project titled "${projectName}". 
 The following is the primary material (author's voice) from the project:
 ---
-${authorVoice.slice(0, 100000)}
+${authorVoice}
 ---
 You are the developmental editor. Help the author push on ideas, find patterns, or explore the thesis.`;
 
     return ai.chats.create({
-      model: "gemini-3.1-flash-preview",
+      model: ENV.MODELS.TEXT_FLASH,
       config: { systemInstruction: context },
       history
     });
   }
+}
 
-  public static async createLiveSession(projectName: string, authorVoice: string, callbacks: any) {
+export class LiveAIService {
+  // Uncle Bob Audit #8: Removed any typing on callbacks
+  public static async createLiveSession(projectName: string, authorVoice: string, callbacks: { onmessage: (m: unknown) => void, onclose: () => void, onerror: (e: unknown) => void }) {
     const liveInstruction = `You are a developmental editor listening to the author's voice material for the project "${projectName}". 
-Primary Material: ${authorVoice.slice(0, 50000)}
+Primary Material: ${authorVoice}
 Engage in a voice-to-voice dialogue. Push on their patterns, identify subsurface emotional beats, and help them refine their thesis. 
 Keep responses concise and focused on the material. Always prioritize the author's specificity.`;
 
     return await ai.live.connect({
-      model: "gemini-3.1-flash-live-preview",
+      model: ENV.MODELS.LIVE,
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
@@ -130,3 +136,10 @@ Keep responses concise and focused on the material. Always prioritize the author
     });
   }
 }
+
+// Keep backward compatible export mapping for existing routes.ts references before we fully decouple
+export const AIService = {
+  analyzeMaterial: TextAIService.analyzeMaterial,
+  createChatSession: TextAIService.createChatSession,
+  createLiveSession: LiveAIService.createLiveSession
+};
