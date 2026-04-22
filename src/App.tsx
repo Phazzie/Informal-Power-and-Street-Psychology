@@ -52,18 +52,23 @@ export default function App() {
     }
 
     try {
-      const toastId = toast.loading("Saving material to database...");
-      for (const p of newProjects) {
-        await storage.saveProject(user.uid, p);
-      }
-      toast.update(toastId, { render: "Material imported successfully.", type: "success", isLoading: false, autoClose: 3000 });
+      toast.success("Importing material in the background...");
       
+      // Close modal and set selected project immediately (Optimistic UI)
       dispatch({ type: 'CLOSE_IMPORT' });
       if (newProjects.length > 0) {
         dispatch({ type: 'SET_PROJECT', payload: newProjects[0].id });
       }
+
+      // Offline queues / background upload
+      for (const p of newProjects) {
+        // Fire-and-forget background upload using offline-capable Firestore Adapter
+        storage.saveProject(user.uid, p).catch(e => {
+          toast.error(`Background upload failed for ${p.name}: ${e.message}`);
+        });
+      }
     } catch (e: any) {
-      toast.error(`Failed to import: ${e.message}`);
+      toast.error(`Failed to dispatch import: ${e.message}`);
     }
   }, [user, storage, dispatch]);
 

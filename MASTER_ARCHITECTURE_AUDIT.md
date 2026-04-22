@@ -11,7 +11,7 @@ This document merges strict Clean Architecture (SOLID, KISS, DRY) with adversari
 
 ## PHASE 2: THE FRONTEND PERFORMANCE VANGUARD
 - [x] **2.1 The DOM Meltdown Fix (Markdown Memoization):** Isolate individual Chat messages in a `React.memo` component with a custom `areEqual` function. Stop the entire chat history from re-parsing React-Markdown on every high-frequency AI stream chunk. [COMPLETED]
-- [ ] **2.2 Optimistic UI & Offline Queues:** Prevent Silent Data Loss. When pushing a chat message or saving a project, update the UI instantly. If the network call fails, catch the error, inform the user, and queue the payload locally (IndexedDB/Fallback).
+- [x] **2.2 Optimistic UI & Offline Queues:** Prevent Silent Data Loss. When pushing a chat message or saving a project, update the UI instantly. If the network call fails, catch the error, inform the user, and queue the payload locally (IndexedDB/Fallback). [COMPLETED via offline-capable Firestore + Reducer optimistic pushes + Async App.tsx saves]
 - [x] **2.3 Network Race Condition Abortions:** Use `AbortController`. If a user clicks away while an analysis or chat is streaming, kill the fetch request to free up CPU and network overhead. [COMPLETED on LLM requests]
 - [x] **2.4 Bulletproof UX States:** Replaced `window.alert()` with non-blocking Toasts and wrapped application in a top-level `ErrorBoundary` catching fatal renders. [COMPLETED]
 
@@ -19,14 +19,14 @@ This document merges strict Clean Architecture (SOLID, KISS, DRY) with adversari
 - [x] **3.1 Annihilate Prop-Drilling:** `AppLayout.tsx` takes too many props. Implement `ProjectContext` and `AuthContext` to segregate data so child components request their own dependencies directly, eliminating middleman component coupling. [COMPLETED utilizing AppProvider]
 - [x] **3.2 Hexagonal Dependency Injection:** Stop hardcoding `dbService.ts` inside `useAnalysis`. Create TypeScript interfaces (`IStoragePort`) and inject the adapter. [COMPLETED]
 - [x] **3.3 Explicit State Machines:** Replace the "boolean soup" (`isImporting`, `isLoading`, `isVoiceOpen`) with a strictly typed `useReducer` State Machine to mathematically prevent impossible UI states. [COMPLETED for App / useChat]
-- [ ] **3.4 Rich Domain Entities:** Upgrade data interfaces to ES6 Classes that encapsulate their own validation logic (e.g., `project.addConversation()`) instead of letting React components mutate raw arrays.
+- [x] **3.4 Rich Domain Entities:** Upgrade data interfaces to ES6 Classes that encapsulate their own validation logic (e.g., `project.addConversation()`) instead of letting React components mutate raw arrays. [COMPLETED implementing ProjectEntity model with Encapsulation]
 
 ## PHASE 4: ACCESSIBILITY & ADA COMPLIANCE
 - [x] **4.1 Focus Trapping:** Lock the keyboard `Tab` loop inside Modals (`FileImport`, `VoiceSession`) so screen readers don't wander into the background. [COMPLETED using react-focus-lock]
 - [x] **4.2 ARIA Topography:** Apply rigorous `aria-labels`, `role="status"`, and `aria-live="polite"` tags to the chat typing indicators and icon buttons. [COMPLETED]
 
 ## PHASE 5: THE SEAM TESTS
-- [ ] **5.1 Vitest / Supertest Initialization:** Write pure automated assertions for the core State Machine and backend validation rules.
+- [x] **5.1 Vitest / Supertest Initialization:** Write pure automated assertions for the core State Machine and backend validation rules. [COMPLETED -> /tests/domain + /tests/backend]
 
 ## PHASE 6: SEAM DRIVEN DEVELOPMENT (SDD) ENFORCEMENT AUDIT
 *A bounty hunter auditing the app for Testability and Port/Adapter boundaries would identify severe tightly coupled monolithic blocks that make unit testing practically impossible without mocking entire environments.*
