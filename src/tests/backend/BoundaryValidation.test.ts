@@ -28,7 +28,7 @@ describe('Backend Boundary Validation (Zod)', () => {
         authorVoice: 'Context...',
         projectName: 'My Project',
         message: 'Hello Assistant',
-        history: [{ role: 'user', content: 'Hi' }]
+        history: [{ role: 'user', parts: [{ text: 'Hi' }] }]
       };
       const res = ChatSchema.safeParse(validPayload);
       expect(res.success).toBe(true);
@@ -39,7 +39,7 @@ describe('Backend Boundary Validation (Zod)', () => {
         authorVoice: 'Context...',
         projectName: 'My Project',
         message: 'Hello Assistant',
-        history: [{ role: 'alien', content: 'Take me to your leader' }]
+        history: [{ role: 'alien', parts: [{ text: 'Take me to your leader' }] }]
       };
       const res = ChatSchema.safeParse(invalidPayload);
       expect(res.success).toBe(false);
